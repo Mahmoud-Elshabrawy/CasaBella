@@ -1,5 +1,8 @@
 const express = require("express");
 const cors = require("cors");
+const GlobalError = require("./middlewares/globalError");
+const routes = require("./routes/index");
+const AppError = require("./utils/appError");
 
 const app = express();
 
@@ -8,8 +11,14 @@ app.use(express.json());
 
 app.use(cors());
 
-app.get("/", (req, res) => {
-  res.send("Hello World!");
+app.use("/api/v1", routes);
+
+// Not Found Route
+app.use((req, res, next) => {
+  next(new AppError(`Can\'t find this route: ${req.originalUrl}`, 404));
 });
+
+// Global Error Handler
+app.use(GlobalError);
 
 module.exports = app;

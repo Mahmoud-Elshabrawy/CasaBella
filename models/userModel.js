@@ -1,35 +1,47 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
-const userSchema = new mongoose.Schema({
-  firstName: {
-    type: String,
-    required: [true, "FIRST_NAME_REQUIRED"],
-    trim: true,
-    min: [3, "FIRST_NAME_TOO_SHORT"],
-  },
-  lastName: {
-    type: String,
-    required: [true, "FIRST_NAME_REQUIRED"],
-    trim: true,
-    min: [3, "FIRST_NAME_TOO_SHORT"],
-  },
+const userSchema = new mongoose.Schema(
+  {
+    firstName: {
+      type: String,
+      required: [true, "FIRST_NAME_REQUIRED"],
+      trim: true,
+      minlength: [3, "FIRST_NAME_TOO_SHORT"],
+    },
+    lastName: {
+      type: String,
+      required: [true, "LAST_NAME_REQUIRED"],
+      trim: true,
+      minlength: [3, "LAST_NAME_TOO_SHORT"],
+    },
 
-  role: {
-    type: String,
-    enum: ["user", "admin"],
-  },
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
 
-  email: {
-    type: String,
-    trim: true,
-    required: [true, "EMAIL_REQUIRED"],
-  },
+    email: {
+      type: String,
+      trim: true,
+      required: [true, "EMAIL_REQUIRED"],
+      unique: true,
+    },
 
-  password: {
-    type: String,
-    trim: true,
-    required: [true, "PASSWORD_REQUIRED"],
+    password: {
+      type: String,
+      required: [true, "PASSWORD_REQUIRED"],
+    },
   },
+  { timestamps: true },
+);
+
+// hash password
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 12);
 });
 
-module.exports = mongoose.Model("User", userSchema);
+
+module.exports = mongoose.model("User", userSchema);
