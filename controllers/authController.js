@@ -18,6 +18,15 @@ exports.login = async (req, res, next) => {
 };
 
 
+exports.logout = async (req, res, next) => {
+  await authService.logout(req.user._id);
+  return res.status(200).json({
+    success: true,
+    message: "Logout successful",
+  })
+}
+
+
 exports.changePassword = async (req, res, next) => {
   const user = await authService.changePassword(req.body, req.user._id)
   return res.status(200).json({
@@ -41,4 +50,12 @@ exports.resetPassword = async (req, res, next) => {
     success: true,
     data: {...user},
   });
+}
+
+exports.refreshToken = async (req, res, next) => {
+    const user = await authService.createRefreshToken(req.body.refreshToken);
+    return res.status(200).json({
+        success: true,
+        data: {...user},
+    });
 }
