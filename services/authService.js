@@ -1,8 +1,14 @@
 const User = require("../models/userModel");
 const AppError = require("../utils/appError");
-const { generateToken } = require("../utils/generateToken");
+const { generateToken, generateRefreshToken } = require("../utils/generateToken");
 const { sendEmail } = require("../services/emailService");
 const { generatePasswordResetEmail } = require("../utils/emailTemplates");
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
+
+const hashToken = (token) => {
+  return crypto.createHash("sha256").update(token).digest("hex");
+};
 
 exports.register = async (body) => {
   const { firstName, lastName, email, password } = body;
@@ -15,6 +21,10 @@ exports.register = async (body) => {
 
   const user = await User.create({ firstName, lastName, email, password });
   const token = generateToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
+
+  user.refreshToken = hashToken(refreshToken);
+  await user.save({ validateBeforeSave: false });
 
   return {
     _id: user._id,
@@ -23,6 +33,7 @@ exports.register = async (body) => {
     email: user.email,
     role: user.role,
     token,
+    refreshToken,
   };
 };
 
@@ -36,6 +47,10 @@ exports.login = async (body) => {
   }
 
   const token = generateToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
+
+  user.refreshToken = hashToken(refreshToken);
+  await user.save({ validateBeforeSave: false });
 
   return {
     _id: user._id,
@@ -44,8 +59,22 @@ exports.login = async (body) => {
     email: user.email,
     role: user.role,
     token,
+    refreshToken,
   };
 };
+
+exports.logout = async (userId) => {
+    // check if user exists
+    const user = await User.findById(userId);
+    if(!user){
+        throw new AppError("User not found", 404);
+    }
+
+    // remove refresh token
+    user.refreshToken = undefined;
+    await user.save({ validateBeforeSave: false });
+
+}
 
 exports.changePassword = async (body, userId) => {
   const { currentPassword, newPassword, confirmNewPassword } = body;
@@ -82,6 +111,10 @@ exports.changePassword = async (body, userId) => {
 
   // generate new token
   const token = generateToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
+
+  user.refreshToken = hashToken(refreshToken);
+  await user.save({ validateBeforeSave: false });
 
   return {
     _id: user._id,
@@ -90,6 +123,7 @@ exports.changePassword = async (body, userId) => {
     email: user.email,
     role: user.role,
     token,
+    refreshToken,
   };
 };
 
@@ -171,6 +205,10 @@ exports.resetPassword = async (body) => {
 
   // 7) Generate new access token
   const token = generateToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
+
+  user.refreshToken = hashToken(refreshToken);
+  await user.save({ validateBeforeSave: false });
 
   return {
     _id: user._id,
@@ -179,5 +217,45 @@ exports.resetPassword = async (body) => {
     email: user.email,
     role: user.role,
     token,
+    refreshToken,
   };
 };
+
+
+exports.createRefreshToken = async (refreshToken) => {
+
+    if(!refreshToken)
+        throw new AppError("Please provide refresh token", 400);
+
+    // verify refresh token
+    const decodedToken = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const userId = decodedToken.id;
+
+    // check if user exists
+    const user = await User.findById(userId).select("+refreshToken");
+    if(!user){
+        throw new AppError("User not found", 404);
+    }
+
+    // verify refresh token
+    if(hashToken(refreshToken) !== user.refreshToken){
+        throw new AppError("Invalid refresh token", 401);
+    }
+
+    // generate new token
+    const token = generateToken(user._id);
+    const newRefreshToken = generateRefreshToken(user._id);
+
+    user.refreshToken = hashToken(newRefreshToken);
+    await user.save({ validateBeforeSave: false });
+
+    return {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        token,
+        refreshToken: newRefreshToken,
+    }
+}   
