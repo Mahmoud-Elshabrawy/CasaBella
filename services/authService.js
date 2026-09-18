@@ -13,6 +13,28 @@ const hashToken = (token) => {
   return crypto.createHash("sha256").update(token).digest("hex");
 };
 
+const formatUser = (user) => ({
+  _id: user._id,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  email: user.email,
+  role: user.role,
+  active: user.active,
+});
+
+const issueTokens = async (user) => {
+  const token = generateToken(user._id)
+  const refreshToken = generateRefreshToken(user._id)
+
+  user.refreshToken = hashToken(refreshToken)
+  await user.save({ validateBeforeSave: false })
+
+  return {
+    token,
+    refreshToken,
+  }
+}
+
 exports.register = async (body) => {
   const { firstName, lastName, email, password } = body;
 
@@ -61,12 +83,7 @@ exports.register = async (body) => {
   }
 
   return {
-    _id: user._id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    role: user.role,
-    active: user.active,
+   ...formatUser(user)
   };
 };
 
@@ -81,20 +98,11 @@ exports.login = async (body) => {
 
   if (!user.active) throw new AppError("Your account is not active.", 403);
 
-  const token = generateToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  user.refreshToken = hashToken(refreshToken);
-  await user.save({ validateBeforeSave: false });
+  const tokens = await issueTokens(user);
 
   return {
-    _id: user._id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    role: user.role,
-    token,
-    refreshToken,
+   ...formatUser(user),
+    ...tokens
   };
 };
 
@@ -143,25 +151,15 @@ exports.changePassword = async (body, userId) => {
   user.password = newPassword;
   await user.save();
 
-  // generate new token
-  const token = generateToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  user.refreshToken = hashToken(refreshToken);
-  await user.save({ validateBeforeSave: false });
+  const tokens = await issueTokens(user);
 
   return {
-    _id: user._id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    role: user.role,
-    token,
-    refreshToken,
+   ...formatUser(user),
+    ...tokens
   };
 };
 
-exports.forgetPassword = async (email) => {
+exports.forgotPassword = async (email) => {
   if (!email) {
     throw new AppError("Please provide your email", 400);
   }
@@ -240,20 +238,11 @@ exports.resetPassword = async (body) => {
   await user.save();
 
   // 7) Generate new access token
-  const token = generateToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  user.refreshToken = hashToken(refreshToken);
-  await user.save({ validateBeforeSave: false });
+  const tokens = await issueTokens(user);
 
   return {
-    _id: user._id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    role: user.role,
-    token,
-    refreshToken,
+   ...formatUser(user),
+    ...tokens
   };
 };
 
@@ -276,20 +265,11 @@ exports.createRefreshToken = async (refreshToken) => {
   }
 
   // generate new token
-  const token = generateToken(user._id);
-  const newRefreshToken = generateRefreshToken(user._id);
-
-  user.refreshToken = hashToken(newRefreshToken);
-  await user.save({ validateBeforeSave: false });
+  const tokens = await issueTokens(user);
 
   return {
-    _id: user._id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    role: user.role,
-    token,
-    refreshToken: newRefreshToken,
+   ...formatUser(user),
+    ...tokens
   };
 };
 
@@ -313,20 +293,11 @@ exports.verifyEmail = async (body) => {
   user.emailVerificationOTP = undefined;
   user.emailVerificationExpires = undefined;
 
-  const token = generateToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  user.refreshToken = hashToken(refreshToken);
-  await user.save({ validateBeforeSave: false });
+  const tokens = await issueTokens(user);
 
   return {
-    _id: user._id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    role: user.role,
-    token,
-    refreshToken,
+   ...formatUser(user),
+    ...tokens
   };
 };
 

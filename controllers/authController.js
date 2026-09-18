@@ -33,7 +33,7 @@ exports.changePassword = async (req, res, next) => {
 };
 
 exports.forgotPassword = async (req, res, next) => {
-  await authService.forgetPassword(req.body.email);
+  await authService.forgotPassword(req.body.email);
   return res.status(200).json({
     success: true,
     message: "OTP sent successfully",
