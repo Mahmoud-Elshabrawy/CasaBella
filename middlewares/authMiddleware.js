@@ -34,6 +34,12 @@ exports.protect = async (req, res, next) => {
     );
   }
 
+  if (!currentUser.active) {
+    return next(
+      new AppError("your account is not active.", 403),
+    );
+  }
+
   // Check if user changed password after token was issued
   if(currentUser.changedPasswordAfter(decoded.iat)){
     return next(

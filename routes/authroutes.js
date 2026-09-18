@@ -10,6 +10,8 @@ router.patch("/change-password", protect, authController.changePassword);
 router.post("/forget-password", authController.forgotPassword);
 router.patch("/reset-password", authController.resetPassword);
 router.post("/refresh-token", authController.refreshToken);
+router.post("/verify-email", authController.verifyEmail);
+router.post("/resend-verify-email", authController.resendVerifyEmail);
 
 
 module.exports = router;

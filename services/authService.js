@@ -1,6 +1,9 @@
 const User = require("../models/userModel");
 const AppError = require("../utils/appError");
-const { generateToken, generateRefreshToken } = require("../utils/generateToken");
+const {
+  generateToken,
+  generateRefreshToken,
+} = require("../utils/generateToken");
 const { sendEmail } = require("../services/emailService");
 const { generatePasswordResetEmail } = require("../utils/emailTemplates");
 const crypto = require("crypto");
@@ -16,15 +19,46 @@ exports.register = async (body) => {
   // check if user exists
   const existsUser = await User.findOne({ email: email });
   if (existsUser) {
+    if (!existsUser.active) {
+      throw new AppError(
+        "Account is not verified. Please verify your email or resend the verification code",
+        409,
+      );
+    }
     throw new AppError("User already exists", 409);
   }
 
-  const user = await User.create({ firstName, lastName, email, password });
-  const token = generateToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
+  const user = await User.create({
+    firstName,
+    lastName,
+    email,
+    password,
+    active: false,
+  });
 
-  user.refreshToken = hashToken(refreshToken);
+  const otp = user.createEmailVerificationOtp();
   await user.save({ validateBeforeSave: false });
+
+  try {
+    const html = generatePasswordResetEmail(
+      otp,
+      `${user.firstName} ${user.lastName}`,
+    );
+    await sendEmail({
+      to: user.email,
+      subject: "CasaBella Email Verification OTP",
+      text: `Your email verification code is ${otp}. This code will expire in 10 minutes.`,
+      html,
+    });
+  } catch (err) {
+    user.emailVerificationOTP = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+    throw new AppError(
+      "There was an error sending the email. Try again later!",
+      500,
+    );
+  }
 
   return {
     _id: user._id,
@@ -32,8 +66,7 @@ exports.register = async (body) => {
     lastName: user.lastName,
     email: user.email,
     role: user.role,
-    token,
-    refreshToken,
+    active: user.active,
   };
 };
 
@@ -45,6 +78,8 @@ exports.login = async (body) => {
   if (!user || !(await user.comparePassword(password))) {
     throw new AppError("Invalid email or password", 401);
   }
+
+  if (!user.active) throw new AppError("Your account is not active.", 403);
 
   const token = generateToken(user._id);
   const refreshToken = generateRefreshToken(user._id);
@@ -64,17 +99,16 @@ exports.login = async (body) => {
 };
 
 exports.logout = async (userId) => {
-    // check if user exists
-    const user = await User.findById(userId);
-    if(!user){
-        throw new AppError("User not found", 404);
-    }
+  // check if user exists
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
 
-    // remove refresh token
-    user.refreshToken = undefined;
-    await user.save({ validateBeforeSave: false });
-
-}
+  // remove refresh token
+  user.refreshToken = undefined;
+  await user.save({ validateBeforeSave: false });
+};
 
 exports.changePassword = async (body, userId) => {
   const { currentPassword, newPassword, confirmNewPassword } = body;
@@ -143,7 +177,10 @@ exports.forgetPassword = async (email) => {
   await user.save({ validateBeforeSave: false });
 
   try {
-    const html = generatePasswordResetEmail(otp, `${user.firstName} ${user.lastName}`);
+    const html = generatePasswordResetEmail(
+      otp,
+      `${user.firstName} ${user.lastName}`,
+    );
 
     // send email
     await sendEmail({
@@ -162,7 +199,6 @@ exports.forgetPassword = async (email) => {
     );
   }
 };
-
 
 exports.resetPassword = async (body) => {
   const { email, otp, newPassword, confirmNewPassword } = body;
@@ -221,41 +257,108 @@ exports.resetPassword = async (body) => {
   };
 };
 
-
 exports.createRefreshToken = async (refreshToken) => {
+  if (!refreshToken) throw new AppError("Please provide refresh token", 400);
 
-    if(!refreshToken)
-        throw new AppError("Please provide refresh token", 400);
+  // verify refresh token
+  const decodedToken = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+  const userId = decodedToken.id;
 
-    // verify refresh token
-    const decodedToken = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    const userId = decodedToken.id;
+  // check if user exists
+  const user = await User.findById(userId).select("+refreshToken");
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
 
-    // check if user exists
-    const user = await User.findById(userId).select("+refreshToken");
-    if(!user){
-        throw new AppError("User not found", 404);
-    }
+  // verify refresh token
+  if (hashToken(refreshToken) !== user.refreshToken) {
+    throw new AppError("Invalid refresh token", 401);
+  }
 
-    // verify refresh token
-    if(hashToken(refreshToken) !== user.refreshToken){
-        throw new AppError("Invalid refresh token", 401);
-    }
+  // generate new token
+  const token = generateToken(user._id);
+  const newRefreshToken = generateRefreshToken(user._id);
 
-    // generate new token
-    const token = generateToken(user._id);
-    const newRefreshToken = generateRefreshToken(user._id);
+  user.refreshToken = hashToken(newRefreshToken);
+  await user.save({ validateBeforeSave: false });
 
-    user.refreshToken = hashToken(newRefreshToken);
+  return {
+    _id: user._id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    role: user.role,
+    token,
+    refreshToken: newRefreshToken,
+  };
+};
+
+exports.verifyEmail = async (body) => {
+  const { email, otp } = body;
+  if (!email || !otp)
+    throw new AppError("please provide all the required fields", 400);
+
+  const user = await User.findOne({ email }).select(
+    "+emailVerificationOTP +emailVerificationExpires",
+  );
+  if (!user) throw new AppError("there is no user with this email", 404);
+
+  //verify email
+  if (!user.verifyEmailVerification(otp)) {
+    throw new AppError("Invalid or expired OTP", 400);
+  }
+
+  user.active = true;
+
+  user.emailVerificationOTP = undefined;
+  user.emailVerificationExpires = undefined;
+
+  const token = generateToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
+
+  user.refreshToken = hashToken(refreshToken);
+  await user.save({ validateBeforeSave: false });
+
+  return {
+    _id: user._id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    role: user.role,
+    token,
+    refreshToken,
+  };
+};
+
+exports.resendVerifyEmail = async (email) => {
+  if (!email) throw new AppError("please provide your email", 400);
+
+  // check if user exists
+  const user = await User.findOne({ email });
+  if (!user) throw new AppError("User not found", 404);
+
+  // check if user is already verified
+  if (user.active) throw new AppError("Your email is already verified", 400);
+
+  // generate new OTP
+  const otp = user.createEmailVerificationOtp();
+  await user.save({ validateBeforeSave: false });
+
+  try {
+    const html = generatePasswordResetEmail(otp, user.firstName);
+    await sendEmail({
+      to: user.email,
+      subject: "Verify Your Email",
+      text: `Your email verification code is ${otp}. This code will expire in 10 minutes.`,
+      html,
+    });
+  } catch (err) {
+    user.emailVerificationOTP = undefined;
+    user.emailVerificationExpires = undefined;
     await user.save({ validateBeforeSave: false });
-
-    return {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        token,
-        refreshToken: newRefreshToken,
-    }
-}   
+    throw new AppError(
+      "There was an error sending the email. Try again later!",
+      500,
+    );
+  }
+};
