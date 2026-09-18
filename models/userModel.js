@@ -36,11 +36,19 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
+    active: {
+      type: Boolean,
+      default: true,
+    },
+
     refreshToken: String,
 
     passwordChangedAt: Date,
     passwordResetOTP: String,
     passwordResetExpires: Date,
+
+    emailVerificationOTP: String,
+    emailVerificationExpires: Date,
   },
   { timestamps: true },
 );
@@ -81,10 +89,28 @@ userSchema.methods.createPasswordResetOTP = function () {
 userSchema.methods.verifyResetPassword = function (otp) {
   const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
   return (
-    hashedOTP === this.passwordResetOTP && this.passwordResetExpires > Date.now()
+    hashedOTP === this.passwordResetOTP &&
+    this.passwordResetExpires > Date.now()
   );
 };
 
+// generate email verification code
+userSchema.methods.createEmailVerificationOtp = function () {
+  const otp = crypto.randomInt(100000, 1000000).toString();
+  this.emailVerificationOTP = crypto
+    .createHash("sha256")
+    .update(otp)
+    .digest("hex");
+  this.emailVerificationExpires = Date.now() + 10 * 60 * 1000;
+  return otp;
+};
 
+userSchema.methods.verifyEmailVerification = function (otp) {
+  const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
+  return (
+    hashedOTP === this.emailVerificationOTP &&
+    this.emailVerificationExpires > Date.now()
+  );
+};
 
 module.exports = mongoose.model("User", userSchema);
