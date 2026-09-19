@@ -1,8 +1,10 @@
 const express = require("express");
-const authroutes = require("./authroutes");
+const authRoutes = require("./authRoutes");
+const mainCategoriesRoutes = require("./mainCategoriesRoutes");
 
 const router = express.Router();
 
-router.use("/auth", authroutes);
+router.use("/auth", authRoutes);
+router.use("/main-categories", mainCategoriesRoutes);
 
 module.exports = router;
