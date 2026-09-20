@@ -14,8 +14,6 @@ const { sendEmail } = require("../services/emailService");
 
 const { generatePasswordResetEmail } = require("../utils/emailTemplates");
 
-// ======================================================
-
 const hashToken = (token) => {
   return crypto.createHash("sha256").update(token).digest("hex");
 };
@@ -28,8 +26,6 @@ const formatUser = (user) => ({
   role: user.role,
   active: user.active,
 });
-
-
 
 const issueTokens = async (user) => {
   const token = generateToken(user._id);
@@ -47,7 +43,6 @@ const issueTokens = async (user) => {
     refreshToken,
   };
 };
-
 
 exports.register = asyncHandler(async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
@@ -108,7 +103,7 @@ exports.register = asyncHandler(async (req, res) => {
   }
 
   res.status(201).json({
-    status: "success",
+    success: true,
     data: {
       ...formatUser(user),
     },
@@ -133,7 +128,7 @@ exports.login = asyncHandler(async (req, res) => {
   const tokens = await issueTokens(user);
 
   res.status(200).json({
-    status: "success",
+    success: true,
     data: {
       ...formatUser(user),
       ...tokens,
@@ -155,7 +150,7 @@ exports.logout = asyncHandler(async (req, res) => {
   });
 
   res.status(200).json({
-    status: "success",
+    success: true,
     message: "Logged out successfully",
   });
 });
@@ -195,7 +190,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
   const tokens = await issueTokens(user);
 
   res.status(200).json({
-    status: "success",
+    success: true,
     data: {
       ...formatUser(user),
       ...tokens,
@@ -251,15 +246,46 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   }
 
   res.status(200).json({
-    status: "success",
+    success: true,
     message: "Password reset OTP sent successfully",
   });
 });
 
-exports.resetPassword = asyncHandler(async (req, res) => {
-  const { email, otp, newPassword, confirmNewPassword } = req.body;
+exports.verifyResetPasswordOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
 
-  if (!email || !otp || !newPassword || !confirmNewPassword) {
+  if (!email || !otp) {
+    throw new AppError("Please provide email and OTP", 400);
+  }
+
+  const user = await User.findOne({
+    email,
+  }).select("+passwordResetOTP +passwordResetExpires");
+
+  if (!user) {
+    throw new AppError("user not found", 404);
+  }
+
+  if (!user.verifyResetPassword(otp)) {
+    throw new AppError("Invalid or expired OTP", 400);
+  }
+
+  user.passwordResetVerified = true;
+
+  await user.save({
+    validateBeforeSave: false,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "OTP verified successfully",
+  });
+});
+
+exports.resetPassword = asyncHandler(async (req, res) => {
+  const { email, newPassword, confirmNewPassword } = req.body;
+
+  if (!email || !newPassword || !confirmNewPassword) {
     throw new AppError("Please provide all required fields", 400);
   }
 
@@ -278,21 +304,22 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     throw new AppError("User not found", 404);
   }
 
-  if (!user.verifyResetPassword(otp)) {
-    throw new AppError("Invalid or expired OTP", 400);
+  if (!user.passwordResetVerified) {
+    throw new AppError("Please verify OTP first", 400);
   }
 
   user.password = newPassword;
 
   user.passwordResetOTP = undefined;
   user.passwordResetExpires = undefined;
+  user.passwordResetVerified = false;
 
   await user.save();
 
   const tokens = await issueTokens(user);
 
   res.status(200).json({
-    status: "success",
+    success: true,
     data: {
       ...formatUser(user),
       ...tokens,
@@ -324,7 +351,7 @@ exports.createRefreshToken = asyncHandler(async (req, res) => {
   const tokens = await issueTokens(user);
 
   res.status(200).json({
-    status: "success",
+    success: true,
     data: {
       ...formatUser(user),
       ...tokens,
@@ -360,7 +387,7 @@ exports.verifyEmail = asyncHandler(async (req, res) => {
   const tokens = await issueTokens(user);
 
   res.status(200).json({
-    status: "success",
+    success: true,
     message: "Email verified successfully",
     data: {
       ...formatUser(user),
@@ -419,7 +446,7 @@ exports.resendVerifyEmail = asyncHandler(async (req, res) => {
   }
 
   res.status(200).json({
-    status: "success",
+    success: true,
     message: "Verification OTP sent successfully",
   });
 });

@@ -4,17 +4,11 @@ const crypto = require("crypto");
 
 const userSchema = new mongoose.Schema(
   {
-    firstName: {
+    name: {
       type: String,
       required: [true, "FIRST_NAME_REQUIRED"],
       trim: true,
       minlength: [3, "FIRST_NAME_TOO_SHORT"],
-    },
-    lastName: {
-      type: String,
-      required: [true, "LAST_NAME_REQUIRED"],
-      trim: true,
-      minlength: [3, "LAST_NAME_TOO_SHORT"],
     },
 
     role: {
@@ -38,7 +32,7 @@ const userSchema = new mongoose.Schema(
 
     active: {
       type: Boolean,
-      default: true,
+      default: false,
     },
 
     refreshToken: String,
@@ -46,6 +40,10 @@ const userSchema = new mongoose.Schema(
     passwordChangedAt: Date,
     passwordResetOTP: String,
     passwordResetExpires: Date,
+    passwordResetVerified: {
+      type: Boolean,
+      default: false,
+    },
 
     emailVerificationOTP: String,
     emailVerificationExpires: Date,
