@@ -1,9 +1,9 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const asyncHandler = require("express-async-handler");
-
+const catchAsync = require("../utils/catchAsync");
 const User = require("../models/userModel");
 const AppError = require("../utils/appError");
+
 
 const {
   generateToken,
@@ -44,7 +44,7 @@ const issueTokens = async (user) => {
   };
 };
 
-exports.register = asyncHandler(async (req, res) => {
+exports.register = catchAsync(async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
 
   const existsUser = await User.findOne({
@@ -110,7 +110,7 @@ exports.register = asyncHandler(async (req, res) => {
   });
 });
 
-exports.login = asyncHandler(async (req, res) => {
+exports.login = catchAsync(async (req, res) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({
@@ -136,7 +136,7 @@ exports.login = asyncHandler(async (req, res) => {
   });
 });
 
-exports.logout = asyncHandler(async (req, res) => {
+exports.logout = catchAsync(async (req, res) => {
   const user = await User.findById(req.user._id);
 
   if (!user) {
@@ -155,7 +155,7 @@ exports.logout = asyncHandler(async (req, res) => {
   });
 });
 
-exports.changePassword = asyncHandler(async (req, res) => {
+exports.changePassword = catchAsync(async (req, res) => {
   const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
   if (!currentPassword || !newPassword || !confirmNewPassword) {
@@ -198,7 +198,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
   });
 });
 
-exports.forgotPassword = asyncHandler(async (req, res) => {
+exports.forgotPassword = catchAsync(async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
@@ -251,7 +251,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   });
 });
 
-exports.verifyResetPasswordOTP = asyncHandler(async (req, res) => {
+exports.verifyResetPasswordOTP = catchAsync(async (req, res) => {
   const { email, otp } = req.body;
 
   if (!email || !otp) {
@@ -282,7 +282,7 @@ exports.verifyResetPasswordOTP = asyncHandler(async (req, res) => {
   });
 });
 
-exports.resetPassword = asyncHandler(async (req, res) => {
+exports.resetPassword = catchAsync(async (req, res) => {
   const { email, newPassword, confirmNewPassword } = req.body;
 
   if (!email || !newPassword || !confirmNewPassword) {
@@ -327,7 +327,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   });
 });
 
-exports.createRefreshToken = asyncHandler(async (req, res) => {
+exports.refreshToken = catchAsync(async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
@@ -359,7 +359,9 @@ exports.createRefreshToken = asyncHandler(async (req, res) => {
   });
 });
 
-exports.verifyEmail = asyncHandler(async (req, res) => {
+exports.createRefreshToken = exports.refreshToken;
+
+exports.verifyEmail = catchAsync(async (req, res) => {
   const { email, otp } = req.body;
 
   if (!email || !otp) {
@@ -396,7 +398,7 @@ exports.verifyEmail = asyncHandler(async (req, res) => {
   });
 });
 
-exports.resendVerifyEmail = asyncHandler(async (req, res) => {
+exports.resendVerifyEmail = catchAsync(async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
