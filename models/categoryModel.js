@@ -10,7 +10,7 @@ const categorySchema = new mongoose.Schema(
     },
     image: String,
 
-    parentCategory: {
+    mainCategory: {
       type: mongoose.Schema.ObjectId,
       ref: "MainCategory",
       required: [true, "MAIN_CATEGORY_REQUIRED"],
@@ -22,11 +22,9 @@ const categorySchema = new mongoose.Schema(
 categorySchema.index(
   {
     name: 1,
-    parentCategory: 1,
+    mainCategory: 1,
   },
   { unique: true },
 );
-
-
 
 module.exports = mongoose.model("Category", categorySchema);

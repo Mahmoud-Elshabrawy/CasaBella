@@ -3,7 +3,7 @@ const factory = require("./handlerFactory");
 
 exports.getAllCategories = factory.getAll(Category);
 
-exports.getCategory = factory.getOne(Category);
+exports.getCategory = factory.getOne(Category, "mainCategory");
 
 exports.createCategory = factory.createOne(Category);
 
