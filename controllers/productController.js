@@ -7,21 +7,33 @@ const AppError = require("../utils/appError");
 
 const { deleteFiles } = require("../utils/deleteFiles");
 
+exports.setCategoryFilter = catchAsync(async (req, res, next) => {
+  if (req.params.categoryId) {
+    req.query.category = req.params.categoryId;
+  }
+  next();
+});
+
 exports.getAllProducts = factory.getAll(Product);
 
 exports.getProduct = factory.getOne(Product, "category");
 
 exports.createProduct = catchAsync(async (req, res) => {
-
   const uploadedFiles = req.files ? req.files.map((file) => file.filename) : [];
 
   try {
     const category = await Category.findById(req.body.category);
-    if (!category || !req.body.name || !req.body.description || !req.body.details || !req.body.price || !req.body.stock) {
+    if (
+      !category ||
+      !req.body.name ||
+      !req.body.description ||
+      !req.body.details ||
+      !req.body.price ||
+      !req.body.stock
+    ) {
       throw new AppError("PLEASE_PROVIDE_ALL_THE_REQUIRED_FIELDS", 400);
     }
 
-   
     const productData = {
       name: req.body.name,
       description: req.body.description,
@@ -33,76 +45,92 @@ exports.createProduct = catchAsync(async (req, res) => {
       stock: req.body.stock,
       isActive: req.body.isActive,
     };
-  
+
     productData.slug = slugify(req.body.name, {
       lower: true,
       strict: true,
       trim: true,
     });
-  
+
     const product = await Product.create(productData);
-  
+
     res.status(201).json({
       status: "success",
       data: product,
     });
-
   } catch (err) {
     await deleteFiles("products", uploadedFiles);
     throw err;
   }
 });
 
-exports.updateProduct = catchAsync(async (req, res, next) => {
-  const product = await Product.findById(req.params.id);
+exports.updateProduct = catchAsync(async (req, res) => {
+  const uploadedFiles = req.files ? req.files.map((file) => file.filename) : [];
 
-  if (!product) {
-    return next(new AppError("PRODUCT_NOT_FOUND", 404));
-  }
+  let oldImages = [];
 
-  // If category changed
-  if (req.body.category !== undefined) {
-    const category = await Category.findById(req.body.category);
+  try {
+    const product = await Product.findById(req.params.id);
 
-    if (!category) {
-      return next(new AppError("CATEGORY_NOT_FOUND", 404));
+    if (!product) {
+      throw new AppError("PRODUCT_NOT_FOUND", 404);
     }
-  }
 
-  const allowedFields = [
-    "name",
-    "description",
-    "details",
-    "images",
-    "price",
-    "discountPrice",
-    "category",
-    "stock",
-    "isActive",
-  ];
+    // If category changed
+    if (req.body.category !== undefined) {
+      const category = await Category.findById(req.body.category);
 
-  // Update allowed fields only
-  allowedFields.forEach((field) => {
-    if (req.body[field] !== undefined) {
-      product[field] = req.body[field];
+      if (!category) {
+        throw new AppError("CATEGORY_NOT_FOUND", 404);
+      }
     }
-  });
 
-  // Update slug if product name changed
-  if (req.body.name !== undefined) {
-    product.slug = slugify(req.body.name, {
-      lower: true,
-      strict: true,
-      trim: true,
+    const allowedFields = [
+      "name",
+      "description",
+      "details",
+      "price",
+      "discountPrice",
+      "category",
+      "stock",
+      "isActive",
+    ];
+
+    // Update allowed fields only
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        product[field] = req.body[field];
+      }
     });
+
+    // Update slug if product name changed
+    if (req.body.name !== undefined) {
+      product.slug = slugify(req.body.name, {
+        lower: true,
+        strict: true,
+        trim: true,
+      });
+    }
+
+    if (uploadedFiles.length > 0) {
+      oldImages = [...product.images];
+      product.images = uploadedFiles;
+    }
+
+    await product.save();
+
+    if (oldImages.length > 0) {
+      await deleteFiles("products", oldImages);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: product,
+    });
+  } catch (err) {
+    await deleteFiles("products", uploadedFiles);
+    throw err;
   }
-
-  await product.save();
-
-  res.status(200).json({
-    success: true,
-    data: product,
-  });
 });
 
 exports.deleteProduct = catchAsync(async (req, res, next) => {
@@ -119,4 +147,3 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
     data: null,
   });
 });
-

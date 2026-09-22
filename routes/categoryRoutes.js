@@ -10,7 +10,11 @@ const {
   deleteCategory,
 } = require("../controllers/categoryController");
 
+const productRoutes = require("./productRoutes");
+
 const router = express.Router();
+
+router.use("/:categoryId/products", productRoutes);
 
 router
   .route("/")
