@@ -1,6 +1,6 @@
 const express = require("express");
 const { uploadMultipleImages } = require("../middlewares/uploadMiddleware");
-const { protect, restrictTo } = require("../middlewares/authMiddleware");
+const { protect, restrictTo, optionalAuth } = require("../middlewares/authMiddleware");
 
 const {
   getAllProducts,
@@ -15,7 +15,7 @@ const router = express.Router({ mergeParams: true });
 
 router
   .route("/")
-  .get(setCategoryFilter, getAllProducts)
+  .get(optionalAuth, setCategoryFilter, getAllProducts)
   .post(
     protect,
     restrictTo("admin"),
