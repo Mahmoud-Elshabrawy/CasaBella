@@ -1,11 +1,13 @@
 const slugify = require("slugify");
 const Product = require("../models/productModel");
+const Favourite = require("../models/favouriteModel");
 const Category = require("../models/categoryModel");
 const factory = require("./handlerFactory");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 
 const { deleteFiles } = require("../utils/deleteFiles");
+const ApiFeatures = require("../utils/apiFeatures");
 
 exports.setCategoryFilter = catchAsync(async (req, res, next) => {
   if (req.params.categoryId) {
@@ -14,7 +16,68 @@ exports.setCategoryFilter = catchAsync(async (req, res, next) => {
   next();
 });
 
-exports.getAllProducts = factory.getAll(Product);
+exports.getAllProducts = catchAsync(async (req, res, next) => {
+  const filter = {};
+  const countDocuments = await Product.countDocuments(filter);
+  const features = new ApiFeatures(Product.find(filter).lean(), req.query)
+    .filter()
+    .sort()
+    .limitFields()
+    .search()
+    .paginate(countDocuments);
+
+  const products = await features.query;
+  // No products
+  if (products.length === 0) {
+    return res.status(200).json({
+      status: "success",
+      results: 0,
+      paginateResult: features.paginateResult,
+      data: [],
+    });
+  }
+
+  // Guest user
+  if (!req.user) {
+    const productsWithFavorite = products.map((product) => ({
+      ...product,
+      isFavorite: false,
+    }));
+
+    return res.status(200).json({
+      status: "success",
+      results: productsWithFavorite.length,
+      paginateResult: features.paginateResult,
+      data: productsWithFavorite,
+    });
+  }
+
+  // logged in user
+  const productsIds = products.map((product) => product._id);
+
+  const favProducts = await Favourite.find({
+    user: req.user._id,
+    product: { $in: productsIds },
+  })
+    .select("product")
+    .lean();
+
+  const favProductIds = new Set(
+    favProducts.map((favourite) => favourite.product.toString()),
+  );
+
+  const productsWithFav = products.map((product) => ({
+    ...product,
+    isFavorite: favProductIds.has(product._id.toString()),
+  }));
+
+  res.status(200).json({
+    success: true,
+    results: productsWithFav.length,
+    paginateResult: features.paginateResult,
+    data: productsWithFav,
+  });
+});
 
 exports.getProduct = factory.getOne(Product, "category");
 

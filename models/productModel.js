@@ -87,6 +87,8 @@ const productSchema = new mongoose.Schema(
   },
 );
 
+productSchema.index({ category: 1 });
+
 productSchema.pre("save", function () {
   this.isAvailable = this.stock > 0;
 });
