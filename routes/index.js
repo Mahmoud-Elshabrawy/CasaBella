@@ -5,6 +5,7 @@ const categoriesRoutes = require("./categoryRoutes");
 const productsRoutes = require("./productRoutes");
 const favouriteRoutes = require("./favouriteRoutes");
 const cartRoutes = require("./cartRoutes")
+const orderRoutes = require("./orderRoutes")
 
 const router = express.Router();
 
@@ -14,5 +15,6 @@ router.use("/categories", categoriesRoutes);
 router.use("/products", productsRoutes);
 router.use("/favourites", favouriteRoutes);
 router.use("/cart", cartRoutes);
+router.use("/orders", orderRoutes);
 
 module.exports = router;
