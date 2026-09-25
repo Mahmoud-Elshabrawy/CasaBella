@@ -4,6 +4,8 @@ const Order = require("../models/orderModel");
 const Cart = require("../models/cartModel");
 const AppError = require("../utils/appError");
 
+const { validateAndCalcCoupon } = require("./couponService");
+
 exports.createOrderTransaction = async (userId, orderData) => {
   const session = await mongoose.startSession();
 
@@ -11,7 +13,7 @@ exports.createOrderTransaction = async (userId, orderData) => {
 
   try {
     await session.withTransaction(async () => {
-      const { shippingAddress, notes } = orderData;
+      const { shippingAddress, notes, couponCode } = orderData;
 
       if (
         !shippingAddress?.phone ||
@@ -70,13 +72,25 @@ exports.createOrderTransaction = async (userId, orderData) => {
       }
 
       const shippingFee = 0;
-      const couponDiscount = 0;
+      let couponDiscount = 0;
+      let appliedCoupon;
+
+      if (couponCode) {
+        const { coupon, discountAmount } = await validateAndCalcCoupon(
+          couponCode,
+          subtotal,
+          session,
+        );
+        couponDiscount = discountAmount;
+        appliedCoupon = coupon;
+      }
 
       const totalAmount = subtotal + shippingFee - couponDiscount;
 
       const order = new Order({
         user: userId,
         orderItems,
+        couponCode: appliedCoupon ? appliedCoupon.code : null,
         shippingAddress,
         notes: notes || "",
         subtotal,
@@ -86,6 +100,11 @@ exports.createOrderTransaction = async (userId, orderData) => {
       });
 
       await order.save({ session });
+
+      if (appliedCoupon) {
+        appliedCoupon.usedCount += 1
+        await appliedCoupon.save({ session })
+      }
 
       for (const item of cart.cartItems) {
         const product = item.product;
