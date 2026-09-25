@@ -6,9 +6,9 @@ const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "FIRST_NAME_REQUIRED"],
+      required: [true, "NAME_REQUIRED"],
       trim: true,
-      minlength: [3, "FIRST_NAME_TOO_SHORT"],
+      minlength: [3, "NAME_TOO_SHORT"],
     },
 
     role: {
@@ -28,6 +28,15 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "PASSWORD_REQUIRED"],
       select: false,
+      minlength: [8, "PASSWORD_TOO_SHORT"],
+      validate: {
+        validator: function (value) {
+          return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/.test(
+            value,
+          );
+        },
+        message: "PASSWORD_NOT_STRONG_ENOUGH",
+      },
     },
 
     active: {
@@ -35,18 +44,22 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
-    refreshToken: String,
+    refreshToken: {
+      type: String,
+      select: false,
+    },
 
-    passwordChangedAt: Date,
-    passwordResetOTP: String,
-    passwordResetExpires: Date,
+    passwordChangedAt: { type: Date, select: false },
+    passwordResetOTP: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
     passwordResetVerified: {
       type: Boolean,
       default: false,
+      select: false,
     },
 
-    emailVerificationOTP: String,
-    emailVerificationExpires: Date,
+    emailVerificationOTP: { type: String, select: false },
+    emailVerificationExpires: { type: Date, select: false },
   },
   { timestamps: true },
 );

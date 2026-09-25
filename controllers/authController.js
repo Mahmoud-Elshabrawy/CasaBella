@@ -20,8 +20,7 @@ const hashToken = (token) => {
 
 const formatUser = (user) => ({
   _id: user._id,
-  firstName: user.firstName,
-  lastName: user.lastName,
+  name: user.name,
   email: user.email,
   role: user.role,
   active: user.active,
@@ -45,7 +44,7 @@ const issueTokens = async (user) => {
 };
 
 exports.register = catchAsync(async (req, res) => {
-  const { firstName, lastName, email, password } = req.body;
+  const { name, email, password } = req.body;
 
   const existsUser = await User.findOne({
     email,
@@ -63,8 +62,7 @@ exports.register = catchAsync(async (req, res) => {
   }
 
   const user = await User.create({
-    firstName,
-    lastName,
+    name,
     email,
     password,
     active: false,
@@ -79,7 +77,7 @@ exports.register = catchAsync(async (req, res) => {
   try {
     const html = generatePasswordResetEmail(
       otp,
-      `${user.firstName} ${user.lastName}`,
+      `${user.name}`,
     );
 
     await sendEmail({
@@ -222,7 +220,7 @@ exports.forgotPassword = catchAsync(async (req, res) => {
   try {
     const html = generatePasswordResetEmail(
       otp,
-      `${user.firstName} ${user.lastName}`,
+      `${user.name}`,
     );
 
     await sendEmail({
@@ -424,7 +422,7 @@ exports.resendVerifyEmail = catchAsync(async (req, res) => {
   });
 
   try {
-    const html = generatePasswordResetEmail(otp, user.firstName);
+    const html = generatePasswordResetEmail(otp, user.name);
 
     await sendEmail({
       to: user.email,
