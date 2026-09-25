@@ -1,6 +1,9 @@
 const Coupon = require("../models/couponModel");
+const Cart = require("../models/cartModel");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
+
+const { validateAndCalcCoupon } = require("../services/couponService");
 
 exports.getAllCoupons = catchAsync(async (req, res, next) => {
   const coupons = await Coupon.find().sort("-createdAt");
@@ -59,5 +62,48 @@ exports.deleteCoupon = catchAsync(async (req, res, next) => {
   res.json({
     success: true,
     data: null,
+  });
+});
+
+exports.applyCoupon = catchAsync(async (req, res, next) => {
+  const { code } = req.body;
+  if (!code) return next(new AppError("COUPON_CODE_REQUIRED", 400));
+
+  const cart = await Cart.findOne({ user: req.user._id }).populate({
+    path: "cartItems.product",
+    select: "price discountPrice isActive isAvailable",
+  });
+  if (!cart) return next(new AppError("CART_NOT_FOUND", 404));
+
+  let subtotal = 0;
+
+  for (const item of cart.cartItems) {
+    const product = item.product;
+    if (!product) {
+      return next(new AppError("PRODUCT_NOT_FOUND", 404));
+    }
+
+    if (!product.isActive || !product.isAvailable) {
+      return next(new AppError("PRODUCT_NOT_AVAILABLE", 400));
+    }
+    const productDiscount = product.discountPrice || 0;
+
+    const finalPrice = product.price - productDiscount;
+
+    subtotal += finalPrice * item.quantity;
+  }
+
+  const { coupon, discountAmount } = await validateAndCalcCoupon(code, subtotal);
+
+  const totalAmount = subtotal - discountAmount;
+
+  res.json({
+    success: true,
+    data: {
+      couponCode: code,
+      subtotal,
+      discountAmount,
+      totalAmount,
+    },
   });
 });
