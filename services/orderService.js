@@ -6,10 +6,14 @@ const AppError = require("../utils/appError");
 
 const { validateAndCalcCoupon } = require("./couponService");
 
+const LOW_STOCK_THRESHOLD = 5;
+
 exports.createOrderTransaction = async (userId, orderData) => {
   const session = await mongoose.startSession();
 
   let createdOrder;
+  let lowStockProducts = [];
+  let outOfStockProducts = [];
 
   try {
     await session.withTransaction(async () => {
@@ -102,14 +106,38 @@ exports.createOrderTransaction = async (userId, orderData) => {
       await order.save({ session });
 
       if (appliedCoupon) {
-        appliedCoupon.usedCount += 1
-        await appliedCoupon.save({ session })
+        appliedCoupon.usedCount += 1;
+        await appliedCoupon.save({ session });
       }
 
       for (const item of cart.cartItems) {
         const product = item.product;
+        const oldStock = product.stock;
 
         product.stock -= item.quantity;
+
+        const newStock = product.stock
+
+        // low stock
+        if (oldStock > LOW_STOCK_THRESHOLD && newStock <= LOW_STOCK_THRESHOLD) {
+          lowStockProducts.push({
+            _id: product._id,
+            name: product.name,
+            oldStock,
+            newStock,
+          })
+        }
+
+        // out of stock
+        if (oldStock > 0 && newStock === 0) {
+          product.isAvailable = false;
+          outOfStockProducts.push({
+            _id: product._id,
+            name: product.name,
+            oldStock,
+            newStock,
+          })
+        }
 
         await product.save({ session });
       }
@@ -121,7 +149,11 @@ exports.createOrderTransaction = async (userId, orderData) => {
       createdOrder = order;
     });
 
-    return createdOrder;
+    return {
+      order: createdOrder,
+      lowStockProducts,
+      outOfStockProducts,
+    };
   } finally {
     await session.endSession();
   }
