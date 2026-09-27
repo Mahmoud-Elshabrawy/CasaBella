@@ -51,3 +51,70 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     data: user,
   });
 });
+
+exports.saveFcmToken = catchAsync(async (req, res, next) => {
+  const { token, platform } = req.body;
+
+  if (!token) {
+    return next(new AppError("FCM_TOKEN_REQUIRED", 400));
+  }
+
+  if (!platform || !["android", "ios"].includes(platform)) {
+    return next(new AppError("INVALID_PLATFORM", 400));
+  }
+
+  // remove this token form other user
+  await User.updateMany(
+    { _id: { $ne: req.user._id } },
+    { $pull: { fcmTokens: { token } } },
+  );
+
+  const existingToken = await User.exists({
+    _id: req.user._id,
+    fcmTokens: { $elemMatch: { token } },
+  });
+
+  if (!existingToken) {
+    await User.findOneAndUpdate(
+      { _id: req.user._id },
+      {
+        $push: { fcmTokens: { token, platform, updatedAt: Date.now() } },
+      },
+      {
+        runValidators: true,
+      },
+    );
+  } else {
+    await User.findOneAndUpdate(
+      {
+        _id: req.user._id,
+        fcmTokens: { $elemMatch: { token } },
+      },
+      {
+        $set: {
+          "fcmTokens.$.platform": platform,
+          "fcmTokens.$.updatedAt": Date.now(),
+        },
+      },
+      { runValidators: true },
+    );
+  }
+
+  res.status(200).json({
+    success: true,
+  });
+});
+
+exports.removeFcmToken = catchAsync(async (req, res, next) => {
+  const { token } = req.body;
+  if (!token) return next(new AppError("FCM_TOKEN_REQUIRED", 400));
+
+  await User.findOneAndUpdate(
+    { _id: req.user._id },
+    { $pull: { fcmTokens: { token } } },
+  );
+
+  res.status(200).json({
+    success: true,
+  });
+});
