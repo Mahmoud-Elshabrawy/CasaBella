@@ -17,6 +17,10 @@ exports.createOrderTransaction = async (userId, orderData) => {
 
   try {
     await session.withTransaction(async () => {
+      createOrder = undefined;
+      lowStockProducts = [];
+      outOfStockProducts = [];
+
       const { shippingAddress, notes, couponCode } = orderData;
 
       if (
@@ -116,16 +120,20 @@ exports.createOrderTransaction = async (userId, orderData) => {
 
         product.stock -= item.quantity;
 
-        const newStock = product.stock
+        const newStock = product.stock;
 
         // low stock
-        if (oldStock > LOW_STOCK_THRESHOLD && newStock <= LOW_STOCK_THRESHOLD) {
+        if (
+          oldStock > LOW_STOCK_THRESHOLD &&
+          newStock <= LOW_STOCK_THRESHOLD &&
+          newStock > 0
+        ) {
           lowStockProducts.push({
             _id: product._id,
             name: product.name,
             oldStock,
             newStock,
-          })
+          });
         }
 
         // out of stock
@@ -136,7 +144,7 @@ exports.createOrderTransaction = async (userId, orderData) => {
             name: product.name,
             oldStock,
             newStock,
-          })
+          });
         }
 
         await product.save({ session });

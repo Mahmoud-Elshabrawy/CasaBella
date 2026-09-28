@@ -84,6 +84,11 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+userSchema.index(
+  {"fcmTokens.token": 1},
+  {unique: true}
+)
+
 // hash password
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;

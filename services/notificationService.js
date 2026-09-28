@@ -22,6 +22,19 @@ exports.createNotification = async ({
     imageUrl,
   });
 
+  try {
+    await exports.sendPushToUser({
+      userId: user,
+      title,
+      message,
+      type: notification.type,
+      order,
+      product,
+    });
+  } catch (error) {
+    console.error("Push notification failed:", error.message);
+  }
+
   return notification;
 };
 
@@ -39,7 +52,15 @@ exports.sendPushNotification = async ({ token, title, message }) => {
   return response;
 };
 
-exports.sendPushToUser = async ({ userId, title, message }) => {
+exports.sendPushToUser = async ({
+  userId,
+  title,
+  message,
+  type,
+  order,
+  product,
+}) => {
+  if (!firebaseApp) return;
   const user = await User.findById(userId).select("fcmTokens");
 
   if (!user || user.fcmTokens.length === 0) {
@@ -47,12 +68,24 @@ exports.sendPushToUser = async ({ userId, title, message }) => {
   }
 
   const tokens = user.fcmTokens.map((token) => token.token);
+  const data = {
+    type,
+  };
+
+  if (type === "ORDER_CREATED" && order) {
+    data.orderId = order.toString();
+  }
+
+  if ((type === "LOW_STOCK" || type === "OUT_OF_STOCK") && product) {
+    data.productId = product.toString();
+  }
 
   const pushMessage = {
     notification: {
       title: title,
       body: message,
     },
+    data,
     tokens,
   };
 

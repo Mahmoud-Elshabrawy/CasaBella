@@ -44,57 +44,65 @@ exports.getOrder = catchAsync(async (req, res) => {
 });
 
 exports.createOrder = catchAsync(async (req, res) => {
-  const {order, lowStockProducts, outOfStockProducts} = await createOrderTransaction(req.user._id, req.body);
+  const { order, lowStockProducts, outOfStockProducts } =
+    await createOrderTransaction(req.user._id, req.body);
 
   // create notifications
   try {
+    const notificationPromises = [];
     // notification for user
-    await createNotification({
-      user: req.user._id,
-      title: "Order Created",
-      message: `Your order #${order._id} has been created successfully.`,
-      order: order._id,
-      type: "ORDER_CREATED",
-    });
+    notificationPromises.push(
+      createNotification({
+        user: req.user._id,
+        title: "Order Created",
+        message: `Your order #${order._id} has been created successfully.`,
+        order: order._id,
+        type: "ORDER_CREATED",
+      }),
+    );
 
     // notification for admins
     const admin = await User.findOne({ role: "admin" }).select("_id");
 
-    // notifications for a new order
-      await createNotification({
-        user: admin._id,
-        title: "New Order Created",
-        message: `A new order #${order._id} has been created by ${req.user.name}.`,
-        type: "ORDER_CREATED",
-        order: order._id,
-      });
-    
-
-    // notification for admins for low stock products
-    await Promise.all(
-      lowStockProducts.map(product => {
-        return createNotification({
+    if (admin) {
+      // notifications for a new order
+      notificationPromises.push(
+        createNotification({
           user: admin._id,
-          title: "Low Stock",
-          message: `Product ${product.name} has low stock. Only ${product.newStock} left.`,
-          product: product._id,
-          type: "LOW_STOCK",
-        });
-      })
-    );
+          title: "New Order Created",
+          message: `A new order #${order._id} has been created by ${req.user.name}.`,
+          type: "ORDER_CREATED",
+          order: order._id,
+        }),
+      );
 
-    // notification for admins for out of stock products
-    await Promise.all(
-      outOfStockProducts.map(product => {
-        return createNotification({
-          user: admin._id,
-          title: "Out of Stock",
-          message: `Product ${product.name} has been completely sold out.`,
-          product: product._id,
-          type: "OUT_OF_STOCK",
-        });
-      })
-    );
+      // notification for admins for low stock products
+      (lowStockProducts.forEach((product) => {
+        notificationPromises.push(
+          createNotification({
+            user: admin._id,
+            title: "Low Stock",
+            message: `Product ${product.name} has low stock. Only ${product.newStock} left.`,
+            product: product._id,
+            type: "LOW_STOCK",
+          }),
+        );
+      }),
+        // notification for admins for out of stock products
+        outOfStockProducts.forEach((product) => {
+          notificationPromises.push(
+            createNotification({
+              user: admin._id,
+              title: "Out of Stock",
+              message: `Product ${product.name} has been completely sold out.`,
+              product: product._id,
+              type: "OUT_OF_STOCK",
+            }),
+          );
+        }));
+    }
+
+    await Promise.allSettled(notificationPromises);
   } catch (err) {
     console.log("Failed to create notification", err.message);
   }
