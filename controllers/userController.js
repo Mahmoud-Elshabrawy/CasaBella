@@ -1,6 +1,9 @@
 const Factory = require("./handlerFactory");
 const User = require("../models/userModel");
 const catchAsync = require("../utils/catchAsync");
+const AppError = require("../utils/appError")
+
+const mongoose = require("mongoose")
 
 exports.getAllUsers = Factory.getAll(User);
 exports.getUser = Factory.getOne(User);
@@ -55,7 +58,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 exports.saveFcmToken = catchAsync(async (req, res, next) => {
   const { token, platform } = req.body;
 
-  if (!token) {
+  if (typeof token !== "string" || !token.trim()) {
     return next(new AppError("FCM_TOKEN_REQUIRED", 400));
   }
 
@@ -63,41 +66,71 @@ exports.saveFcmToken = catchAsync(async (req, res, next) => {
     return next(new AppError("INVALID_PLATFORM", 400));
   }
 
-  // remove this token form other user
-  await User.updateMany(
-    { _id: { $ne: req.user._id } },
-    { $pull: { fcmTokens: { token } } },
-  );
+  const cleanToken = token.trim();
 
-  const existingToken = await User.exists({
-    _id: req.user._id,
-    fcmTokens: { $elemMatch: { token } },
-  });
+  const session = await mongoose.startSession();
 
-  if (!existingToken) {
-    await User.findOneAndUpdate(
-      { _id: req.user._id },
-      {
-        $push: { fcmTokens: { token, platform, updatedAt: Date.now() } },
-      },
-      {
-        runValidators: true,
-      },
-    );
-  } else {
-    await User.findOneAndUpdate(
-      {
-        _id: req.user._id,
-        fcmTokens: { $elemMatch: { token } },
-      },
-      {
-        $set: {
-          "fcmTokens.$.platform": platform,
-          "fcmTokens.$.updatedAt": Date.now(),
+  try {
+    await session.withTransaction(async () => {
+      // remove token from any other user
+      await User.updateMany(
+        {
+          _id: { $ne: req.user._id },
+          "fcmTokens.token": cleanToken,
         },
-      },
-      { runValidators: true },
-    );
+        {
+          $pull: {
+            fcmTokens: {
+              token: cleanToken,
+            },
+          },
+        },
+        { session },
+      );
+
+      // if token already exists for current user, update it
+      const result = await User.updateOne(
+        {
+          _id: req.user._id,
+          "fcmTokens.token": cleanToken,
+        },
+        {
+          $set: {
+            "fcmTokens.$.platform": platform,
+            "fcmTokens.$.updatedAt": new Date(),
+          },
+        },
+        {
+          session,
+          runValidators: true,
+        },
+      );
+
+      // token doesn't exist for current user
+      if (result.matchedCount === 0) {
+        await User.updateOne(
+          {
+            _id: req.user._id,
+            "fcmTokens.token": { $ne: cleanToken },
+          },
+          {
+            $push: {
+              fcmTokens: {
+                token: cleanToken,
+                platform,
+                updatedAt: new Date(),
+              },
+            },
+          },
+          {
+            session,
+            runValidators: true,
+          },
+        );
+      }
+    });
+  } finally {
+    await session.endSession();
   }
 
   res.status(200).json({
