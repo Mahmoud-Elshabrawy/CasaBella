@@ -27,7 +27,7 @@ exports.protect = async (req, res, next) => {
   const decoded = await jwt.verify(token, process.env.JWT_SECRET);
 
   // check if current user still exists
-  const currentUser = await User.findById(decoded.id);
+  const currentUser = await User.findById(decoded.id).select("+passwordChangedAt");
 
   if (!currentUser) {
     return next(

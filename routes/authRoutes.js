@@ -8,10 +8,13 @@ router.post("/login", authController.login);
 router.post("/logout", protect, authController.logout);
 router.patch("/change-password", protect, authController.changePassword);
 router.post("/forget-password", authController.forgotPassword);
+router.post(
+  "/verify-reset-password-otp",
+  authController.verifyResetPasswordOTP,
+);
 router.patch("/reset-password", authController.resetPassword);
 router.post("/refresh-token", authController.createRefreshToken);
 router.post("/verify-email", authController.verifyEmail);
 router.post("/resend-verify-email", authController.resendVerifyEmail);
-
 
 module.exports = router;

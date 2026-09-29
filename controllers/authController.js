@@ -4,7 +4,6 @@ const catchAsync = require("../utils/catchAsync");
 const User = require("../models/userModel");
 const AppError = require("../utils/appError");
 
-
 const {
   generateToken,
   generateRefreshToken,
@@ -12,7 +11,10 @@ const {
 
 const { sendEmail } = require("../services/emailService");
 
-const { generatePasswordResetEmail } = require("../utils/emailTemplates");
+const {
+  generatePasswordResetEmail,
+  generateEmailVerificationEmail,
+} = require("../utils/emailTemplates");
 
 const hashToken = (token) => {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -75,10 +77,7 @@ exports.register = catchAsync(async (req, res) => {
   });
 
   try {
-    const html = generatePasswordResetEmail(
-      otp,
-      `${user.name}`,
-    );
+    const html = generateEmailVerificationEmail(otp, user.name);
 
     await sendEmail({
       to: user.email,
@@ -110,6 +109,10 @@ exports.register = catchAsync(async (req, res) => {
 
 exports.login = catchAsync(async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password) {
+    throw new AppError("Please provide email and password", 400);
+  }
 
   const user = await User.findOne({
     email,
@@ -211,6 +214,13 @@ exports.forgotPassword = catchAsync(async (req, res) => {
     throw new AppError("User not found", 404);
   }
 
+  if (!user.active) {
+    throw new AppError(
+      "Please verify your email before resetting your password",
+      403,
+    );
+  }
+
   const otp = user.createPasswordResetOTP();
 
   await user.save({
@@ -218,10 +228,7 @@ exports.forgotPassword = catchAsync(async (req, res) => {
   });
 
   try {
-    const html = generatePasswordResetEmail(
-      otp,
-      `${user.name}`,
-    );
+    const html = generatePasswordResetEmail(otp, `${user.name}`);
 
     await sendEmail({
       to: user.email,
@@ -264,6 +271,13 @@ exports.verifyResetPasswordOTP = catchAsync(async (req, res) => {
     throw new AppError("user not found", 404);
   }
 
+  if (!user.active) {
+    throw new AppError(
+      "Please verify your email before resetting your password",
+      403,
+    );
+  }
+
   if (!user.verifyResetPassword(otp)) {
     throw new AppError("Invalid or expired OTP", 400);
   }
@@ -296,13 +310,24 @@ exports.resetPassword = catchAsync(async (req, res) => {
 
   const user = await User.findOne({
     email,
-  });
+  }).select("+passwordResetVerified +passwordResetExpires");
 
   if (!user) {
     throw new AppError("User not found", 404);
   }
 
-  if (!user.passwordResetVerified) {
+  if (!user.active) {
+    throw new AppError(
+      "Please verify your email before resetting your password",
+      403,
+    );
+  }
+
+  if (
+    !user.passwordResetVerified ||
+    !user.passwordResetExpires ||
+    user.passwordResetExpires < Date.now()
+  ) {
     throw new AppError("Please verify OTP first", 400);
   }
 
@@ -340,6 +365,10 @@ exports.refreshToken = catchAsync(async (req, res) => {
 
   if (!user) {
     throw new AppError("User not found", 404);
+  }
+
+  if (!user.active) {
+    throw new AppError("Your account is not active.", 403);
   }
 
   if (hashToken(refreshToken) !== user.refreshToken) {
@@ -422,7 +451,7 @@ exports.resendVerifyEmail = catchAsync(async (req, res) => {
   });
 
   try {
-    const html = generatePasswordResetEmail(otp, user.name);
+    const html = generateEmailVerificationEmail(otp, user.name);
 
     await sendEmail({
       to: user.email,
