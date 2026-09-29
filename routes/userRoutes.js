@@ -1,15 +1,34 @@
-const express = require("express")
+const express = require("express");
 
-const {protect, restrictTo} = require("../middlewares/authMiddleware")
-const {getAllUsers, getUser, createUser, updateUser, getMe, updateMe} = require("../controllers/userController")
+const { protect, restrictTo } = require("../middlewares/authMiddleware");
 
-const router = express.Router()
+const {
+  getAllUsers,
+  getUser,
+  createUser,
+  updateUser,
+  getMe,
+  updateMe,
+  saveFcmToken,
+  removeFcmToken,
+} = require("../controllers/userController");
 
-router.use(protect)
+const router = express.Router();
 
-router.route("/me").get(getMe).patch(updateMe)
+// All routes below require authentication
+router.use(protect);
 
-router.route("/", restrictTo("admin")).get(getAllUsers).post(createUser)
-router.route("/:id", restrictTo("admin")).get(getUser).patch(updateUser)
+// Normal user routes
+router.route("/me").get(getMe).patch(updateMe);
 
-module.exports = router
+router.post("/fcm-token", saveFcmToken);
+router.delete("/fcm-token", removeFcmToken);
+
+// Admin only routes
+router.use(restrictTo("admin"));
+
+router.route("/").get(getAllUsers).post(createUser);
+
+router.route("/:id").get(getUser).patch(updateUser);
+
+module.exports = router;
