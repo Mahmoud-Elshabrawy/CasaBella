@@ -22,6 +22,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       required: [true, "EMAIL_REQUIRED"],
       unique: true,
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "EMAIL_INVALID"],
     },
 
     password: {
@@ -94,11 +95,12 @@ userSchema.methods.createPasswordResetOTP = function () {
   const otp = crypto.randomInt(100000, 1000000).toString();
   this.passwordResetOTP = crypto.createHash("sha256").update(otp).digest("hex");
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+  this.passwordResetVerified = false;
   return otp;
 };
 
 userSchema.methods.verifyResetPassword = function (otp) {
-  const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
+  const hashedOTP = crypto.createHash("sha256").update(String(otp)).digest("hex");
   return (
     hashedOTP === this.passwordResetOTP &&
     this.passwordResetExpires > Date.now()
@@ -117,7 +119,7 @@ userSchema.methods.createEmailVerificationOtp = function () {
 };
 
 userSchema.methods.verifyEmailVerification = function (otp) {
-  const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
+  const hashedOTP = crypto.createHash("sha256").update(String(otp)).digest("hex");
   return (
     hashedOTP === this.emailVerificationOTP &&
     this.emailVerificationExpires > Date.now()

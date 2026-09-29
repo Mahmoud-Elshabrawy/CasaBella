@@ -39,11 +39,20 @@ exports.getMe = catchAsync(async (req, res) => {
   });
 });
 
-exports.updateMe = catchAsync(async (req, res, next) => {
+exports.updateMe = catchAsync(async (req, res) => {
+  if (req.body.email) {
+    throw new AppError("Email cannot be updated", 400);
+  }
+
+  const { name } = req.body;
+
   const user = await User.findByIdAndUpdate(
     req.user._id,
-    { name: req.body.name, email: req.body.email },
-    { new: true, runValidators: true },
+    { name },
+    {
+      new: true,
+      runValidators: true,
+    },
   );
 
   res.status(200).json({

@@ -1,9 +1,53 @@
-/**
- * Generates a luxurious, branded HTML email template for Password Reset OTP
- * Matching CasaBella brand identity (Teal #007A87, Charcoal #1E242B, Soft Rose #F4A5AE)
- */
-exports.generatePasswordResetEmail = (otp, userName = "Valued Customer") => {
+const OTP_EMAIL_TYPES = {
+  PASSWORD_RESET: "password-reset",
+  EMAIL_VERIFICATION: "email-verification",
+};
+
+const EMAIL_CONTENT = {
+  [OTP_EMAIL_TYPES.PASSWORD_RESET]: {
+    documentTitle: "CasaBella Password Reset OTP",
+    heading: "Password Reset Verification",
+    message:
+      "We received a request to reset the password for your <strong>CasaBella</strong> account. Use the one-time verification code below to continue:",
+    codeLabel: "Password Reset Code",
+    securityNotice:
+      "If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.",
+  },
+  [OTP_EMAIL_TYPES.EMAIL_VERIFICATION]: {
+    documentTitle: "CasaBella Email Verification OTP",
+    heading: "Verify Your Email Address",
+    message:
+      "Thank you for creating a <strong>CasaBella</strong> account. Use the one-time verification code below to verify your email address:",
+    codeLabel: "Email Verification Code",
+    securityNotice:
+      "If you didn't create a CasaBella account, you can safely ignore this email.",
+  },
+};
+
+const escapeHtml = (value) =>
+  String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+
+const generateOtpEmail = (
+  otp,
+  userName = "Valued Customer",
+  type = OTP_EMAIL_TYPES.PASSWORD_RESET,
+  message,
+) => {
+  const content = EMAIL_CONTENT[type];
+
+  if (!content) {
+    throw new Error("INVALID_OTP_EMAIL_TYPE");
+  }
+
   const currentYear = new Date().getFullYear();
+  const safeOtp = escapeHtml(otp);
+  const safeUserName = escapeHtml(userName);
+  const emailMessage = message ? escapeHtml(message) : content.message;
 
   return `
 <!DOCTYPE html>
@@ -11,7 +55,7 @@ exports.generatePasswordResetEmail = (otp, userName = "Valued Customer") => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CasaBella Password Reset OTP</title>
+  <title>${content.documentTitle}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7f8; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f7f8; padding: 40px 15px;">
@@ -71,11 +115,15 @@ exports.generatePasswordResetEmail = (otp, userName = "Valued Customer") => {
               
               <!-- Title -->
               <h1 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #1E242B; text-align: center;">
-                Password Reset Verification
+                ${content.heading}
               </h1>
+
+              <p style="margin: 0 0 10px 0; font-size: 14px; line-height: 1.6; color: #1E242B; text-align: center;">
+                Hello <strong>${safeUserName}</strong>,
+              </p>
               
               <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #5A6A75; text-align: center;">
-                We received a request to reset your password for your <strong>CasaBella</strong> account. Use the one-time verification code below to complete the process:
+                ${emailMessage}
               </p>
 
               <!-- OTP Box -->
@@ -84,10 +132,10 @@ exports.generatePasswordResetEmail = (otp, userName = "Valued Customer") => {
                   <td align="center">
                     <div style="display: inline-block; background: #F0F8F9; border: 2px dashed #007A87; border-radius: 14px; padding: 18px 36px; text-align: center;">
                       <span style="display: block; font-size: 11px; font-weight: 700; color: #007A87; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;">
-                        Your Verification Code
+                        ${content.codeLabel}
                       </span>
                       <span style="font-family: 'Courier New', Courier, monospace, 'Segoe UI'; font-size: 34px; font-weight: 800; letter-spacing: 10px; color: #007A87; display: inline-block; padding-left: 10px;">
-                        ${otp}
+                        ${safeOtp}
                       </span>
                     </div>
                   </td>
@@ -112,7 +160,7 @@ exports.generatePasswordResetEmail = (otp, userName = "Valued Customer") => {
 
               <!-- Security Notice -->
               <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #8C9BA5; text-align: center;">
-                If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+                ${content.securityNotice}
               </p>
 
             </td>
@@ -148,3 +196,21 @@ exports.generatePasswordResetEmail = (otp, userName = "Valued Customer") => {
 </html>
   `.trim();
 };
+
+exports.generateOtpEmail = generateOtpEmail;
+
+exports.generatePasswordResetEmail = (otp, userName, message) =>
+  generateOtpEmail(
+    otp,
+    userName,
+    OTP_EMAIL_TYPES.PASSWORD_RESET,
+    message,
+  );
+
+exports.generateEmailVerificationEmail = (otp, userName, message) =>
+  generateOtpEmail(
+    otp,
+    userName,
+    OTP_EMAIL_TYPES.EMAIL_VERIFICATION,
+    message,
+  );

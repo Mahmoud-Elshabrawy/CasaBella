@@ -10,6 +10,6 @@ router.use(protect)
 router.route("/me").get(getMe).patch(updateMe)
 
 router.route("/", restrictTo("admin")).get(getAllUsers).post(createUser)
-router.route("/:id").get(getUser).patch(updateUser)
+router.route("/:id", restrictTo("admin")).get(getUser).patch(updateUser)
 
 module.exports = router
