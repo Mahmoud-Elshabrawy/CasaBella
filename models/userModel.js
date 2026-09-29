@@ -40,6 +40,26 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+    fcmTokens: [
+      {
+        token: {
+          type: String,
+          required: true,
+        },
+
+        platform: {
+          type: String,
+          enum: ["android", "ios"],
+          required: true,
+        },
+
+        updatedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+
     active: {
       type: Boolean,
       default: false,
@@ -64,6 +84,11 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+userSchema.index(
+  {"fcmTokens.token": 1},
+  {unique: true}
+)
 
 // hash password
 userSchema.pre("save", async function () {

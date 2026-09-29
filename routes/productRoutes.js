@@ -1,20 +1,21 @@
 const express = require("express");
 const { uploadMultipleImages } = require("../middlewares/uploadMiddleware");
-const { protect, restrictTo } = require("../middlewares/authMiddleware");
+const { protect, restrictTo, optionalAuth } = require("../middlewares/authMiddleware");
 
 const {
   getAllProducts,
+  setCategoryFilter,
   getProduct,
   createProduct,
   updateProduct,
   deleteProduct,
 } = require("../controllers/productController");
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
 router
   .route("/")
-  .get(getAllProducts)
+  .get(optionalAuth, setCategoryFilter, getAllProducts)
   .post(
     protect,
     restrictTo("admin"),
@@ -25,7 +26,7 @@ router
 router
   .route("/:id")
   .get(getProduct)
-  .patch(protect, restrictTo("admin"), updateProduct)
+  .patch(protect, restrictTo("admin"), uploadMultipleImages("products", "images", 5), updateProduct)
   .delete(protect, restrictTo("admin"), deleteProduct);
 
 module.exports = router;

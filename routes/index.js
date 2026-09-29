@@ -4,13 +4,23 @@ const userRoutes = require("./userRoutes")
 const mainCategoriesRoutes = require("./mainCategoriesRoutes");
 const categoriesRoutes = require("./categoryRoutes");
 const productsRoutes = require("./productRoutes");
+const favouriteRoutes = require("./favouriteRoutes");
+const cartRoutes = require("./cartRoutes");
+const orderRoutes = require("./orderRoutes");
+const couponRoutes = require("./couponRoutes");
+const notificationRoutes = require("./notificationRoutes");
 
 const router = express.Router();
 
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
+router.use("/notifications", notificationRoutes);
 router.use("/main-categories", mainCategoriesRoutes);
 router.use("/categories", categoriesRoutes);
 router.use("/products", productsRoutes);
+router.use("/favourites", favouriteRoutes);
+router.use("/cart", cartRoutes);
+router.use("/orders", orderRoutes);
+router.use("/coupons", couponRoutes);
 
 module.exports = router;
