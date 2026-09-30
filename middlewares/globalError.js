@@ -55,6 +55,14 @@ const handleTokenExpiredError = () => {
   return new AppError("Your token has expired. Please log in again.", 401);
 };
 
+const handleInvalidJson = () => {
+  return new AppError("Invalid JSON payload", 400);
+};
+
+const handlePayloadTooLarge = () => {
+  return new AppError("Request body is too large", 413);
+};
+
 const GlobalError = (err, req, res, next) => {
   let error = err;
 
@@ -75,6 +83,14 @@ const GlobalError = (err, req, res, next) => {
     error = handleTokenExpiredError();
   }
 
+  if (err.type === "entity.parse.failed") {
+    error = handleInvalidJson();
+  }
+
+  if (err.type === "entity.too.large") {
+    error = handlePayloadTooLarge();
+  }
+
   error.statusCode = error.statusCode || 500;
   error.status = error.status || "error";
 
@@ -86,4 +102,3 @@ const GlobalError = (err, req, res, next) => {
 };
 
 module.exports = GlobalError;
-
